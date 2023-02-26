@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	_ "github.com/golang/mock/mockgen/model"
 )
 
 //Db transaction
@@ -12,20 +14,29 @@ import (
 // and Queries
 // Because 	the queries struct only define functions
 // that can retrieve or insert data on a single table
-type Store struct {
+type Store interface {
+	Querier
+	TransferTx(ctx context.Context, arg CreateTransferParams) (TransferTxResult, error)
+}
+
+// Defines all the functionalities needed to execute db transaction
+// and Queries
+// Because 	the queries struct only define functions
+// that can retrieve or insert data on a single table
+type SQlStore struct {
 	*Queries
 	db *sql.DB
 }
 
-func NewStore(db *sql.DB) *Store {
-	return &Store{
+func NewStore(db *sql.DB) Store {
+	return &SQlStore{
 		db:      db,
 		Queries: New(db),
 	}
 }
 
 // execTx executes a function within a db transaction
-func (store *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
+func (store *SQlStore) execTx(ctx context.Context, fn func(*Queries) error) error {
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		fmt.Println("err1")
@@ -72,7 +83,7 @@ type TransferTxResult struct {
 // TransferTx performss money transfer transaction between two accounts
 // It Creates transfer record, add account entries, update account Balanace 's within a single
 // db transaction
-func (store *Store) TransferTx(ctx context.Context, arg CreateTransferParams) (TransferTxResult, error) {
+func (store *SQlStore) TransferTx(ctx context.Context, arg CreateTransferParams) (TransferTxResult, error) {
 	var result TransferTxResult
 
 	err := store.execTx(ctx, func(q *Queries) error {
